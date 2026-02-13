@@ -1,0 +1,449 @@
+---
+title: "Likelihood-Based Regression for Nominal Categorical Outcomes"
+author: "<br><br><span style='font-size:25px;'><strong>Lesley Chapman Hannah, Ph.D., M.S.</strong></span><br>College of Graduate Studies<br>Northeast Ohio Medical University"
+format:
+  revealjs:
+    theme: simple
+    slide-number: true
+    # incremental: true
+    chalkboard: true
+    transition: fade
+execute:
+  echo: true
+  warning: false
+  message: false
+  freeze: auto
+---
+
+```{r}
+#| label: setup
+#| include: false
+set.seed(29)
+
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(broom)
+  library(scales)
+  library(nnet)     # multinom()
+  # NOTE: we do NOT attach MASS to avoid masking dplyr::select()
+})
+
+theme_set(theme_minimal(base_size = 18))
+```
+
+
+### Recap: Approaches for Categorical Data Analysis
+
+<div style="font-size:0.7em">
+
+- Next lectures: focused on model-based extension of contingency-table workflows
+
+- Reminder: Categorical data analysis models probabilities of category membership or counts of category memberships
+
+- Categorical outcomes are modeled through probability models and likelihood 
+
+- Categorical data analysis is the set of methods used when the outcome is discrete:
+
+  - **Binary**: Yes/No [logistic regression]
+  - **Nominal**: 3+ categories with no ordering [multinomial regression]
+  - **Ordinal**: ordered categories [ordinal logistic regression]
+  - **Counts in table cells**: contingency tables [log-linear models]
+
+</div>
+
+---
+
+### Recap: Approaches for Categorical Data Analysis
+
+<div style="font-size:0.7em">
+
+Categorical data analysis involves estimating the following with likelihood as the unifying strategy:
+
+- probabilities of category membership
+- counts of category memberships
+
+We will discuss three model families:
+
+- nominal outcome [3+ unordered categories] $\rightarrow$ multinomial regression
+- ordinal outcome [ordered categories] $\rightarrow$ ordinal logistic regression
+- counts in table cells [contingency tables] $\rightarrow$ log-linear models
+
+</div>
+
+---
+
+### Categorical data analysis as a likelihood-based test
+
+<div style="font-size:0.7em">
+Categorical data analysis is centered on estimating the probability distribution for categorical outcomes:
+
+$$
+P(Y = i \mid X)
+$$
+
+
+
+Statistical models specify:
+
+- probability distribution of the categorical outcome
+- likelihood used to estimate unknown parameters
+
+</div>
+---
+
+### Categorical distributions - probability model for categorical outcomes
+
+<div style="font-size:0.7em">
+- categorical random variable has a probability assigned to each category, and the probabilities sum to one
+
+- categorical distribution is the probability model for a discrete random variable that takes one of k mutually exclusive categories, each with probability $\pi_i$, where the probabilities sum to one
+
+- categorical probability models are defined by:
+
+$$
+Y \in \{1, 2, \dots, k\}, \quad P(Y=i)=\pi_i, \quad \sum_{i=1}^{k}\pi_i=1
+$$
+
+where:
+
+- $Y∈{1,2,…,k}$: outcome takes one of k categories
+- $P(Y=i)=π_i$: probability of category i
+- $\sum_{i=1}^{k} \pi_i = 1$ : probabilities must sum to 1
+</div>
+
+---
+
+
+### Log-likelihood function and Categorical Data Analysis
+
+<div style="font-size:0.7em">
+- **log-likelihood**: sum of the log-probabilities that the model assigns to the observed data, expressed as a function of the model parameters
+- log-likelihood helps define how models are estimated, how uncertainty is quantified, and how hypotheses are tested
+
+$$
+ℓ(θ)=\sum_{i=1}^{n} \log f(Y_i \mid \theta)
+$$
+where:
+
+| Component                  | Meaning                           |
+|----------------------------|-----------------------------------|
+| $Y_i$                      | observed outcome                  |
+| $f(Y_i \mid \theta)$       | probability assigned by the model |
+| $\log$                     | converts product into sum         |
+| $\ell(\theta)$             | total model fit to data           |
+| $\theta$                   | parameters being estimated        |
+
+</div>
+---
+
+
+---
+
+
+### Log-likelihood function and Categorical Data Analysis
+<div style="font-size:0.7em">
+| Outcome type | Distribution        | Log-likelihood name        | Model                           |
+|:-------------|:--------------------|:----------------------------|:--------------------------------|
+| Binary       | Bernoulli           | Bernoulli log-likelihood   | Logistic regression             |
+| Nominal      | Multinomial         | Multinomial log-likelihood | Multinomial logistic regression |
+| Ordinal      | Ordered categorical | Ordinal log-likelihood     | Ordinal logistic regression     |
+| Table counts | Multinomial         | Multinomial log-likelihood | Log-linear models               |
+| Table counts | Poisson             | Poisson log-likelihood     | Poisson regression              |
+</div>
+---
+
+### Modeling Framework for Categorical Data
+
+Categorical data analysis example to demonstrate the following categorical data analysis approach:
+
+- fit a probability model 
+- estimate parameters by likelihood 
+- quantify uncertainty 
+- compare models
+
+-----
+
+
+### Multinomial regression and categorical data analysis
+<div style="font-size:0.5em">
+- **multinomial regression**: models the probability that an observation belongs to each category, as a function of predictors
+- multinomial regression is used to model multiple unordered categories 
+- model is used to show how predictors influence the probability of each category
+
+log-likelihood of nominal outcome [unordered categories]:
+
+$$
+\ell(\beta) = \sum_{i=1}^{n} \sum_{j=1}^{k} y_{ij} \log(p_{ij})
+$$
+
+where:
+
+$$
+y_{ij} =
+\begin{cases}
+1 & \text{if observation } i \text{ is in category } j \\
+0 & \text{otherwise}
+\end{cases}
+$$
+
+</div>
+-----
+
+
+
+## Multinomial regression and categorical data analysis
+<div style="font-size:0.6em">
+Use multinomial regression when:
+
+- the outcome has 3+ categories with **no natural order** [nominal]
+- multiple predictors [adjustment]
+- predicted probabilities for each category
+
+Example use cases, estimating:
+
+- tumor subtype [Luminal A, Luminal B, HER2, TNBC]
+- cancer type
+- variant classification [Benign, VUS, Pathogenic]
+</div>
+
+---
+
+
+## Multinomial regression: Biomedical Example
+<div style="font-size:0.6em">
+**Research Background**:
+
+In oncology trials, treatment effectiveness is often summarized using categorical response outcomes that describe how the tumor changed after therapy
+
+Standard RECIST-based response categories include:
+
+**CR [Complete Response]**
+  
+  - complete disappearance of all detectable tumor
+  - represents the most favorable treatment outcome
+  - indicates strong therapeutic effectiveness
+
+**PR [Partial Response]**
+
+  - significant tumor shrinkage, but not complete disappearance
+  - indicates meaningful biological activity of the treatment
+
+
+</div>
+
+---
+
+## Multinomial regression: Biomedical Example
+<div style="font-size:0.6em">
+**Research Background**:
+
+In oncology trials, treatment effectiveness is often summarized using categorical response outcomes that describe how the tumor changed after therapy
+
+Standard RECIST-based response categories include:
+
+**No Response**
+
+  - tumor does not shrink sufficiently, remains stable, or grows
+  - indicates limited or no treatment effectiveness
+  
+
+</div>
+
+---
+
+
+## Multinomial regression: Biomedical Example
+<div style="font-size:0.6em">
+  
+outcomes represent distinct biological states and can be described as:
+
+  - categorical
+  - mutually exclusive
+  - exhaustive [every patient falls into exactly one category]
+  - nominal [no strict mathematical ordering]
+
+statistical representation of outcome
+
+response variable: $Y∈{No Response,PR,CR}$
+
+probability for each patient can be represented as:$P(Y=No Response),P(Y=PR),P(Y=CR)$ 
+
+probability satisfy the following constraint: $P(No Response)+P(PR)+P(CR)=1$
+
+Multinational model goal: 
+
+model how predictors change these probabilities
+
+</div>
+
+---
+
+### Multinomial regression: Biomedical Example
+
+Scientific Question:
+
+> After adjusting for biomarker level and disease stage, does treatment change the probability of complete response, partial response, or no response?
+
+
+---
+
+### Fit multinomial models and inspect coefficients
+
+Fit the baseline (intercept-only) multinomial model
+
+```{r, echo=FALSE}
+#| label: multinom-data
+n <- 450
+dat <- tibble(
+  treatment = factor(sample(c("Control", "Drug"), n, replace = TRUE)),
+  biomarker = rnorm(n),
+  stage = factor(sample(c("I/II", "III/IV"), n, replace = TRUE, prob = c(0.55, 0.45)))
+)
+
+# simulate nominal 3-class outcome via softmax utilities
+eta_CR <- -0.6 + 0.7*(dat$treatment=="Drug") + 0.8*dat$biomarker - 0.3*(dat$stage=="III/IV")
+eta_PR <-  0.2 + 0.4*(dat$treatment=="Drug") + 0.2*dat$biomarker - 0.2*(dat$stage=="III/IV")
+
+den <- 1 + exp(eta_CR) + exp(eta_PR)
+p_CR <- exp(eta_CR)/den
+p_PR <- exp(eta_PR)/den
+
+dat <- dat |>
+  mutate(
+    response = map2_chr(p_CR, p_PR, \(pc, pp) {
+      u <- runif(1)
+      if (u < pc) "CR" else if (u < pc + pp) "PR" else "No Response"
+    }),
+    response = factor(response, levels = c("No Response","PR","CR"))
+  )
+
+#dat |> count(response) |> mutate(prop = percent(n/sum(n)))
+```
+
+
+```r
+#| label: multinom-fit24
+fit0 <- multinom(response ~ 1, data = dat, trace = FALSE)
+```
+
+- model estimates the overall response probabilities, ignoring all predictors
+- Model helps answer: What are the overall probabilities of each outcome in the population?
+
+---
+
+## Fit multinomial models and inspect coefficients
+<div style="font-size:0.6em">
+Fit the multinomial regression model with predictors
+
+- model estimates how predictors change outcome probabilities
+- model estimates the following where each patient has their own probability distribution: $P(Y∣treatment,biomarker,stage)$
+
+- ```coef(fit1)``` returns regression coefficients
+- each row of the output corresponds to a comparison against the reference category ("No Response")
+
+```{r}
+#| label: multinom-fit6
+fit0 <- multinom(response ~ 1, data = dat, trace = FALSE)
+fit1 <- multinom(response ~ treatment + biomarker + stage, data = dat, trace = FALSE)
+
+# coefficients are log-odds vs baseline ("No Response")
+coef(fit1)
+```
+
+
+</div>
+
+
+---
+
+
+## Fit multinomial models and inspect coefficients
+<div style="font-size:0.6em">
+Interpretation of (select) coefficients:
+
+```{r}
+#| label: multinom-fit
+fit0 <- multinom(response ~ 1, data = dat, trace = FALSE)
+fit1 <- multinom(response ~ treatment + biomarker + stage, data = dat, trace = FALSE)
+
+# coefficients are log-odds vs baseline ("No Response")
+coef(fit1)
+```
+
+**Partial response versus no response** 
+
+Drug treatment effect [treatmentDrug]:
+
+coefficient: 0.682
+estimate log odds: $e^{0.6823}=1.98$
+
+Interpretation:
+
+drug nearly doubles the odds of partial response relative to no response, holding biomarker and stage constant
+
+</div>
+---
+
+## Fit multinomial models and inspect coefficients
+<div style="font-size:0.6em">
+Interpretation of (select) coefficients:
+
+```{r}
+#| label: multinom-fit6565
+fit0 <- multinom(response ~ 1, data = dat, trace = FALSE)
+fit1 <- multinom(response ~ treatment + biomarker + stage, data = dat, trace = FALSE)
+
+# coefficients are log-odds vs baseline ("No Response")
+coef(fit1)
+```
+
+**Partial response versus no response** 
+
+Biomarker effect [biomarker]:
+
+coefficient: 0.1500
+estimate log odds: $e^{0.1500}=1.16$
+
+Interpretation:
+
+Higher biomarker values increase the odds of partial response relative to no response
+
+</div>
+---
+
+## Fit multinomial models and inspect coefficients
+<div style="font-size:0.6em">
+Interpretation of (select) coefficients:
+
+```{r}
+#| label: multinom-fit56454
+fit0 <- multinom(response ~ 1, data = dat, trace = FALSE)
+fit1 <- multinom(response ~ treatment + biomarker + stage, data = dat, trace = FALSE)
+
+# coefficients are log-odds vs baseline ("No Response")
+coef(fit1)
+```
+
+**Partial response versus no response** 
+
+Cancer stage effect [stageIII/IV]:
+
+coefficient: −0.2766
+estimate log odds: $e^{−0.2766}=0.76$
+
+Interpretation:
+
+Late stage disease reduces the odds of partial response relative to no response
+</div>
+---
+
+### Summary and Next Lecture
+<div style="font-size:0.6em">
+- Discussed how multinomial regression models categorical outcomes with more than two possible categories
+- Here we defined categorical outcomes as representing a probability distribution across mutually exclusive biological states
+- Multinomial regression model estimates log-odds relationships relative to a reference category and uses maximum likelihood estimation to determine the probability structure most consistent with the observed data
+- Model framework extends logistic regression from binary outcomes to multi-category nominal outcomes while maintaining the same likelihood-based statistical foundation
+
+**Next topics**: ordinal categorical models and log-linear models
+</div>
+---
